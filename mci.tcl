@@ -34,15 +34,61 @@ proc getFunctionMinMax {fnName arClData arFnData} {
     array set fnData $arFnData
 
     set position [list]
+    set done 0
 
-    return [list]
+    set fnData(Fns,$fnName,Min) 0
+    set fnData(Fns,$fnName,Max) 2
+
+    return [array get fnData]
 }
 
 proc integrateFunction {fnName arClData arFnData} {
     array set clData $arClData
     array set fnData $arFnData
 
-    return 0.0
+    set function $fnData(Fns,$fnName,Body)
+    array set rangesBeg {}
+    array set rangesEnd {}
+
+    set min $fnData(Fns,$fnName,Min)
+    set max $fnData(Fns,$fnName,Max)
+    set monteCarloPoints 0
+    set area [expr 1.0 * ($max - $min)]
+
+    foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
+	set function [regsub -all $paramName $function "\$__$paramName"]
+    }
+
+    foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+	set function [regsub -all $rangeName $function "\$__$rangeName"]
+    }
+
+    foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+	set rangesBeg($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
+	set rangesEnd($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,End)
+
+	set area [expr $area * ($rangesEnd($rangeName) - $rangesBeg($rangeName))]
+    }
+
+    puts $function
+
+    for {set i 0} {$i < $clData(SampleSetSize)} {incr i} {
+    	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+    	    set beg $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
+    	    set end $fnData(Fns,$fnName,Ranges,$rangeName,End)
+
+    	    set __$rangeName [expr rand() * ($beg - $end) + $end]
+    	}
+
+    	set monteCarloValue [expr rand() * ($max - $min) + $min]
+    	set functionValue [eval expr $function]
+
+    	if {$monteCarloValue < $functionValue} {
+    	    incr monteCarloPoints
+    	}
+    }
+
+    return [expr $area * $monteCarloPoints / $clData(SampleSetSize)]
 }
 
 proc checkCommandLine {argv} {
@@ -63,7 +109,7 @@ proc parseClData {argv} {
 
     set clData(FnFile) fn.mci
     set clData(MinMaxStep) 0.01
-    set clData(SampleSetSize) 1000
+    set clData(SampleSetSize) 200000
 
     return [array get clData]
 }
@@ -87,7 +133,6 @@ proc parseFnData {fnText} {
 	
 	set fnData(Fns,$fnName,ParamsNames) [list]
 	set fnData(Fns,$fnName,RangesNames) [list]
-	set fnData(Fns,$fnName,Args) {}
 	set fnData(Fns,$fnName,Body) {}
 
 	# Extract section information.
@@ -99,8 +144,7 @@ proc parseFnData {fnText} {
 	set rangesBody [lindex $fnBody [expr $rangesIndex + 1]]
 
 	set ruleIndex [lsearch $fnBody Rule]
-	set ruleArgs [lindex $fnBody [expr $ruleIndex + 1]]
-	set ruleBody [lindex $fnBody [expr $ruleIndex + 2]]
+	set ruleBody [lindex $fnBody [expr $ruleIndex + 1]]
 
 	# Extract function parameter information.
 
@@ -140,7 +184,6 @@ proc parseFnData {fnText} {
 
 	# Extract function rule information.
 
-	set fnData(Fns,$fnName,Args) $ruleArgs
 	set fnData(Fns,$fnName,Body) [join [split [string trim $ruleBody]] { }]
     }
 
