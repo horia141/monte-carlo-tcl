@@ -34,12 +34,84 @@ proc getFunctionMinMax {fnName arClData arFnData} {
     array set fnData $arFnData
 
     set position [list]
+    set begs [list]
+    set ends [list]
     set done 0
 
-    set fnData(Fns,$fnName,Min) 0
-    set fnData(Fns,$fnName,Max) 2
+    set min +inf
+    set max -inf
+
+    foreach rangeName $fnData(Fns,$fnName,RangesNames) {
+	lappend position $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
+	lappend begs $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
+	lappend ends $fnData(Fns,$fnName,Ranges,$rangeName,End)
+    }
+
+    set minMax [_recMinMax position $fnName $arClData $arFnData $begs $ends 0]
+
+    set fnData(Fns,$fnName,Min) [lindex $minMax 0]
+    set fnData(Fns,$fnName,Max) [lindex $minMax 1]
 
     return [array get fnData]
+}
+
+proc _recMinMax {positionName fnName arClData arFnData begs ends index} {
+    upvar 1 $positionName position
+
+    array set clData $arClData
+    array set fnData $arFnData
+
+    set min +inf
+    set max -inf
+    
+    if {$index == ([llength $position] - 1)} {
+	set function $fnData(Fns,$fnName,Body)
+
+	array set rangesBeg {}
+	array set rangesEnd {}
+	
+	foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
+	    set function [regsub -all $paramName $function "\$__$paramName"]
+	}
+
+	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+	    set function [regsub -all $rangeName $function "\$__$rangeName"]
+	}
+
+	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+	    set rangesBeg($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
+	    set rangesEnd($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,End)
+	}
+    }
+
+    while {[lindex $position $index] <= [lindex $ends $index]} {
+	if {$index == ([llength $position] - 1)} {
+	    for {set i 0} {$i < [llength $position]} {incr i} {
+		set __[lindex $fnData(Fns,$fnName,RangesNames) $i] [lindex $position $i]
+	    }
+
+	    set functionValue [eval expr $function]
+	    set minMax [list $functionValue $functionValue]
+	} else {
+	    for {set i [expr $index + 1]} {$i < [llength $position]} {incr i} {
+		lset position $i [lindex $begs $i]
+	    }
+
+	    set minMax [_recMinMax $positionName $fnName $arClData $arFnData $begs $ends [expr $index + 1]]
+	}
+
+	if {[lindex $minMax 0] < $min} {
+	    set min [lindex $minMax 0]
+	}
+
+	if {[lindex $minMax 1] > $max} {
+	    set max [lindex $minMax 1]
+	}
+
+	lset position $index [expr [lindex $position $index] + $clData(MinMaxStep)]
+    }
+
+    return [list $min $max]
 }
 
 proc integrateFunction {fnName arClData arFnData} {
@@ -52,7 +124,8 @@ proc integrateFunction {fnName arClData arFnData} {
 
     set min $fnData(Fns,$fnName,Min)
     set max $fnData(Fns,$fnName,Max)
-    set monteCarloPoints 0
+    set mcPointsAbove0 0
+    set mcPointsBelow0 0
     set area [expr 1.0 * ($max - $min)]
 
     foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
@@ -74,21 +147,22 @@ proc integrateFunction {fnName arClData arFnData} {
 
     for {set i 0} {$i < $clData(SampleSetSize)} {incr i} {
     	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
-    	    set beg $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
-    	    set end $fnData(Fns,$fnName,Ranges,$rangeName,End)
-
-    	    set __$rangeName [expr rand() * ($beg - $end) + $end]
+    	    set __$rangeName [randInRange $rangesBeg($rangeName) $rangesEnd($rangeName)]
     	}
 
     	set monteCarloValue [expr rand() * ($max - $min) + $min]
     	set functionValue [eval expr $function]
 
-    	if {$monteCarloValue < $functionValue} {
-    	    incr monteCarloPoints
-    	}
+	if {$functionValue >= 0 && $monteCarloValue <= $functionValue} {
+	    incr mcPointsAbove0
+	}
+
+	if {$functionValue < 0 && $monteCarloValue >= $functionValue} {
+	    incr mcPointsBelow0
+	}
     }
 
-    return [expr $area * $monteCarloPoints / $clData(SampleSetSize)]
+    return [expr $area * ($mcPointsAbove0 - $mcPointsBelow0) / $clData(SampleSetSize)]
 }
 
 proc checkCommandLine {argv} {
@@ -108,7 +182,7 @@ proc parseClData {argv} {
     array set clData {}
 
     set clData(FnFile) fn.mci
-    set clData(MinMaxStep) 0.01
+    set clData(MinMaxStep) 0.1
     set clData(SampleSetSize) 200000
 
     return [array get clData]
@@ -217,6 +291,10 @@ proc printFnData {arFnData} {
 	puts "  Args: $fnData(Fns,$fnName,Args)"
 	puts "  Body: $fnData(Fns,$fnName,Body)"
     }
+}
+
+proc randInRange {beg end} {
+    return [expr rand() * ($end - $beg) + $beg]
 }
 
 main $argv
