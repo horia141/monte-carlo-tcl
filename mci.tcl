@@ -1,5 +1,7 @@
 #!/usr/bin/env tclsh
 
+set CommandLineArguments {f N step help info}
+
 set InfoMessage {
 Usage: mci.tcl -f [FILE] -N [SAMPLECOUNT] -step [MINMAXSTEP] [...PARAMETERS]
        mci.tcl -help : A help message.
@@ -135,14 +137,6 @@ proc _recMinMax {positionName fnName arClData arFnData begs ends index} {
 	array set rangesBeg {}
 	array set rangesEnd {}
 	
-	foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
-	    set function [regsub -all :$paramName $function "\$__$paramName"]
-	}
-
-	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
-	    set function [regsub -all :$rangeName $function "\$__$rangeName"]
-	}
-
 	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
 	    set rangesBeg($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
 	    set rangesEnd($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,End)
@@ -159,7 +153,7 @@ proc _recMinMax {positionName fnName arClData arFnData begs ends index} {
 		set __[lindex $fnData(Fns,$fnName,RangesNames) $i] [lindex $position $i]
 	    }
 
-	    set functionValue [eval expr $function]
+	    set functionValue [eval expr $fnData(Fns,$fnName,Body)]
 	    set minMax [list $functionValue $functionValue]
 	} else {
 	    for {set i [expr $index + 1]} {$i < [llength $position]} {incr i} {
@@ -187,7 +181,6 @@ proc integrateFunction {fnName arClData arFnData} {
     array set clData $arClData
     array set fnData $arFnData
 
-    set function $fnData(Fns,$fnName,Body)
     array set rangesBeg {}
     array set rangesEnd {}
 
@@ -196,14 +189,6 @@ proc integrateFunction {fnName arClData arFnData} {
     set mcPointsAbove0 0
     set mcPointsBelow0 0
     set area [expr 1.0 * ($max - $min)]
-
-    foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
-	set function [regsub -all :$paramName $function "\$__$paramName"]
-    }
-
-    foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
-	set function [regsub -all :$rangeName $function "\$__$rangeName"]
-    }
 
     foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
 	set rangesBeg($rangeName) $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
@@ -222,7 +207,7 @@ proc integrateFunction {fnName arClData arFnData} {
     	}
 
     	set monteCarloValue [expr rand() * ($max - $min) + $min]
-    	set functionValue [eval expr $function]
+    	set functionValue [eval expr $fnData(Fns,$fnName,Body)]
 
 	if {$functionValue >= 0 && $monteCarloValue <= $functionValue} {
 	    incr mcPointsAbove0
@@ -267,6 +252,8 @@ proc checkCommandLine {argv} {
 
 
 proc checkFnData {fnText} {
+    global CommandLineArguments
+
     set fnErrors [list]
 
     if {[llength $fnText] % 3 != 0} {
@@ -291,6 +278,10 @@ proc checkFnData {fnText} {
 	    }
 
 	    foreach {paramName paramBody} $paramsBody {
+		if {[lsearch $CommandLineArguments $paramName] != -1} {
+		    lappend fnErrors "Invalid parameter name \"$paramName\" in function \"$fnName\"! Parameters must not be named: $CommandLineArguments"
+		}
+
 		switch -- [lindex $paramBody 0] {
 		    Real {
 			if {[llength $paramBody] != 3} {
@@ -435,6 +426,29 @@ proc postCheckFnData {arClData arFnData} {
 	}
     }
 
+    # Check function expressions are valid. Only do this test if all other
+    # tests have passed (and, considering that this is the last action in
+    # "postCheckFnData", by now, all other checks, be they in "checkCommandLine"
+    # or "checkFnData", should have passed).
+
+    if {[llength $postCheckErrors] == 0} {
+	foreach {fnName} $fnData(FnNames) {
+	    foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
+		set __$paramName $clData(Params,$paramName)
+	    }
+
+	    foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+		set __$rangeName $fnData(Fns,$fnName,Ranges,$rangeName,Beg)
+	    }
+
+	    set evalResult [catch {eval expr $fnData(Fns,$fnName,Body)} errorResult]
+
+	    if {$evalResult != 0} {
+		lappend postCheckErrors "Invalid rule for function \"$fnName\"!\nReason: $errorResult"
+	    }
+	}
+    }
+
     return $postCheckErrors
 }
 
@@ -532,7 +546,16 @@ proc parseFnData {fnText} {
 
 	# Extract function rule information.
 
-	set fnData(Fns,$fnName,Body) [join [split [string trim $ruleBody]] { }]
+	set fnData(Fns,$fnName,Rule) [join [split [string trim $ruleBody]] { }]
+	set fnData(Fns,$fnName,Body) $fnData(Fns,$fnName,Rule)
+
+	foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
+	    set fnData(Fns,$fnName,Body) [regsub -all "\\\$$paramName" $fnData(Fns,$fnName,Body) "\$__$paramName"]
+	}
+
+	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+	    set fnData(Fns,$fnName,Body) [regsub -all "\\\$$rangeName" $fnData(Fns,$fnName,Body) "\$__$rangeName"]
+	}
     }
 
     return [array get fnData]
@@ -561,8 +584,8 @@ proc printFnData {arFnData} {
 	    puts "      Beg: $fnData(Fns,$fnName,Ranges,$rangeName,Beg)"
 	    puts "      Beg: $fnData(Fns,$fnName,Ranges,$rangeName,End)"
 	}
-	
-	puts "  Args: $fnData(Fns,$fnName,Args)"
+
+	puts "  Rule: $fnData(Fns,$fnName,Rule)"
 	puts "  Body: $fnData(Fns,$fnName,Body)"
     }
 }
