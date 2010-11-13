@@ -2,6 +2,15 @@
 
 set InfoMessage {
 Usage: mci.tcl -f [FILE] -N [SAMPLECOUNT] -step [MINMAXSTEP] [...PARAMETERS]
+       mci.tcl -help : A help message.
+       mci.tcl -info : This tutorial message.
+
+-f               Path to function definitions file.
+-N               Number of iterations used in integration.
+-step            Input space granularity for MinMax detection.
+-[name] [value]  A parameter from the "Params" section of a function. This
+                 sets the parameter [name] to the value [value]. Used when
+                 integrating and in MinMax.
 
 Computes the definite integral of multi-dimensional functions using Monte
 Carlo Integration. The target function, it's domain and external parameters
@@ -231,7 +240,7 @@ proc checkCommandLine {argv} {
     global InfoMessage
     global HelpMessage
 
-    set clErrors {}
+    set clErrors [list]
 
     if {[lsearch $argv {-info}] != -1} {
 	lappend clErrors $InfoMessage
@@ -258,17 +267,114 @@ proc checkCommandLine {argv} {
 
 
 proc checkFnData {fnText} {
-    return {}
+    set fnErrors [list]
+
+    if {[llength $fnText] % 3 != 0} {
+	lappend fnErrors "Invalid format for input file!"
+    }
+
+    foreach {functionKeyword fnName fnBody} $fnText {
+	if {![string equal $functionKeyword function]} {
+	    lappend fnErrors "Invalid keyword \"$functionKeyword\"! Expecting \"function\" in:\n$functionKeyword [list $fnName] {$fnBody}"
+	}
+
+	set paramsIndex [lsearch $fnBody Params]
+	set paramsBody [lindex $fnBody [expr $paramsIndex + 1]]
+
+	if {$paramsIndex == -1} {
+	    lappend fnErrors "Function \"$fnName\" does not contain a \"Params\" section!"
+	} elseif {$paramsIndex % 2 != 0} {
+	    lappend fnErrors "Invalid format for function \"$fnName\"! Misplaced \"Params\" section:\n$functionKeyword [list $fnName] {$fnBody}"
+	} else {
+	    if {[llength $paramsBody] % 2 != 0} {
+		lappend fnErrors "Invalid format for \"Params\" section in function \"$fnName\": {\n        [string trim $paramsBody]\n}"
+	    }
+
+	    foreach {paramName paramBody} $paramsBody {
+		switch -- [lindex $paramBody 0] {
+		    Real {
+			if {[llength $paramBody] != 3} {
+			    lappend fnErrors "Invalid format for Real Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			} else {
+			    if {![string is double [lindex $paramBody 1]]} {
+				lappend fnErrors "Invalid format for interval start in Real Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    }
+
+			    if {![string is double [lindex $paramBody 2]]} {
+				lappend fnErrors "Invalid format for interval end in Real Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    }
+
+			    if {[lindex $paramBody 1] >= [lindex $paramBody 2]} {
+				lappend fnErrors "Real Param \"$paramName\" from function \"$fnName\" has an interval start value greater than the interval end!"
+			    }
+			}
+		    }
+
+		    default {
+			lappend fnErrors "Params of type \"[lindex $paramBody 0]\" in function \"$fnName\" are unsupported: $paramBody!"
+		    }
+		}
+	    }
+	}
+
+	set rangesIndex [lsearch $fnBody Ranges]
+	set rangesBody [lindex $fnBody [expr $rangesIndex + 1]]
+
+	if {$rangesIndex == -1} {
+	    lappend fnErrors "Function \"$fnName\" does not contain a \"Ranges\" section!"
+	} elseif {$rangesIndex % 2 != 0} {
+	    lappend fnErrors "Invalid format for function \"$fnName\"! Misplaced \"Ranges\" section:\n$functionKeyword [list $fnName] {$fnBody}"
+	} else {
+	    if {[llength $rangesBody] == 0} {
+		lappend fnErrors "Function \"$fnName\" has an empty Ranges section!"
+	    }
+
+	    if {[llength $rangesBody] % 2 != 0} {
+		lappend fnErrors "Invalid format for \"Ranges\" section in function \"$fnName\": {\n        [string trim $rangesBody]\n}"
+	    }
+
+	    foreach {rangeName rangeBody} $rangesBody {
+		switch -- [lindex $rangeBody 0] {
+		    Real {
+			if {[llength $rangeBody] != 3} {
+			    lappend fnErrors "Invalid format for Real Range \"$rangeName\" in function \"$fnName\": $rangeBody!"
+			} else {
+			    if {![string is double [lindex $rangeBody 1]]} {
+				lappend fnErrors "Invalid format for interval start in Real Range \"$rangeName\" in function \"$fnName\": $rangeBody!"
+			    }
+
+			    if {![string is double [lindex $rangeBody 2]]} {
+				lappend fnErrors "Invalid format for interval end in Real Range \"$rangeName\" in function \"$fnName\": $rangeBody!"
+			    }
+
+			    if {[lindex $rangeBody 1] >= [lindex $rangeBody 2]} {
+				lappend fnErrors "Real Range \"$rangeName\" from function \"$fnName\" has an interval start value greater than the interval end!"
+			    }
+			}
+		    }
+
+		    default {
+			lappend fnErrors "Ranges of type \"[lindex $rangeBody 0]\" in function \"$fnName\" are unsupported: $rangeBody!"
+		    }
+		}
+	    }
+	}
+
+	set ruleIndex [lsearch $fnBody Rule]
+	set ruleBody [lindex $fnBody [expr $ruleIndex + 1]]
+    }
+
+    return $fnErrors
 }
 
 proc postCheckFnData {arClData arFnData} {
     array set clData $arClData
     array set fnData $arFnData
 
-    set postCheckErrors {}
+    set postCheckErrors [list]
 
-    set allParams {}
-    set clParams {}
+    set allParams [list]
+    set clParams [list]
 
     foreach {fnName} $fnData(FnNames) {
 	set allParams [concat $allParams $fnData(Fns,$fnName,ParamsNames)]
@@ -276,6 +382,16 @@ proc postCheckFnData {arClData arFnData} {
 
     set allParams [lsort -unique $allParams]
     set clParams [lsort -unique $clData(ParamsNames)]
+
+    # Check no conflicts between ranges and params appear.
+
+    foreach {fnName} $fnData(FnNames) {
+	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
+	    if {[lsearch $fnData(Fns,$fnName,ParamsNames) $rangeName] != -1} {
+		lappend postCheckErrors "Function \"$fnName\" uses name \"$rangeName\" both as a range name and as a parameter name!"
+	    }
+	}
+    }
 
     # Check all required parameters appear in command line.
 
