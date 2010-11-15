@@ -71,7 +71,26 @@ Usage: mci.tcl -f [FILE] -N [SAMPLECOUNT] -step [MINMAXSTEP] [...PARAMETERS]
                  integrating and in MinMax. See "mci.tcl -info" for more.
 }
 
+#
+# Application entry point.
+#
+# Context:
+#   This function is called when Tcl finishes evaluating the source file.
+#   It basically ties together the components making up the application.
+#   It handles parsing the command line, reading and parsing the function
+#   definition file and computing the definite integral.
+# Arguments:
+#   argv: a list representation of the command line.
+# Return:
+#   Nothing.
+# Effect:
+#   The summed effects of all the functions in the application. Whatever the
+#   application does, "main" does as well. Currently, this includes reading
+#   a file and sending messages to standard output.
+#
 proc main {argv} {
+    # Check and parse the command line into "clData".
+
     set clErrors [checkCommandLine $argv]
 
     if {[llength $clErrors] != 0} {
@@ -80,6 +99,8 @@ proc main {argv} {
     }
 
     array set clData [parseClData $argv]
+
+    # Read the contents of the function definition file into "fnText".
 
     set readResult [catch {
 	set fnHandle [open $clData(FnFile) r]
@@ -92,6 +113,8 @@ proc main {argv} {
 	exit 1
     }
 
+    # Check and parse "fnText" into "fnData".
+
     set fnErrors [checkFnData $fnText]
 
     if {[llength $fnErrors] != 0} {
@@ -101,6 +124,8 @@ proc main {argv} {
 
     array set fnData [parseFnData $fnText]
 
+    # Do a post-check for inconsitencies between "clData" and "fnData".
+
     set postCheckErrors [postCheckFnData [array get clData] [array get fnData]]
 
     if {[llength $postCheckErrors] != 0} {
@@ -109,6 +134,10 @@ proc main {argv} {
     }
 
     foreach fnName $fnData(FnNames) {
+	# Determine the minimum and maximum of each function (a piece of
+	# crucial information for the next step) and compute the definite
+	# integral of the current function.
+
 	array set fnData [getFunctionMinMax $fnName [array get clData] [array get fnData]]
 	set integralValue [integrateFunction $fnName [array get clData] [array get fnData]]
 
