@@ -361,6 +361,13 @@ proc integrateFunction {fnName arClData arFnData} {
 	set area [expr $area * ($rangesEnd($rangeName) - $rangesBeg($rangeName))]
     }
 
+    # Preset all parameters. We need to set them once and use them for every
+    # generated sample.
+
+    foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
+	set __$paramName $clData(Params,$paramName)
+    }
+
     # We have to generate "SampleSetSize" points randomly in the hypervolume
     # determined by the function range interals and the image interval of
     # the function. We'll compare this point with the value of the function
@@ -369,10 +376,6 @@ proc integrateFunction {fnName arClData arFnData} {
     for {set i 0} {$i < $clData(SampleSetSize)} {incr i} {
 	# Random generation of range parameters.
 
-	foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
-	    set __$paramName $clData(Params,$paramName)
-	}
-
     	foreach {rangeName} $fnData(Fns,$fnName,RangesNames) {
     	    set __$rangeName [randInRange $rangesBeg($rangeName) $rangesEnd($rangeName)]
     	}
@@ -380,7 +383,7 @@ proc integrateFunction {fnName arClData arFnData} {
 	# Here we generate the last coordinate of the sample point. We also
 	# generate the function value at the sample point.
 
-    	set monteCarloValue [expr rand() * ($max - $min) + $min]
+    	set monteCarloValue [randInRange $min $max]
     	set functionValue [eval expr $fnData(Fns,$fnName,Body)]
 
 	if {$functionValue >= 0 && $monteCarloValue <= $functionValue} {
