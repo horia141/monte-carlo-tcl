@@ -1,0 +1,143 @@
+This application implements the Monte Carlo method for numerically determining
+the definite integral of a function. You can use it to compute the integral
+of hard to integrate functions or functions with no known primitive.
+
+Inputs consist of a function definition file which describes a number of
+functions to integrate and a series of command line options which control
+the Monte Carlo process.
+
+This README file will attempt to document the algorithms used, the major
+data structures employed and the format of the input files and command line.
+
+1.Overview.
+
+The application presents itself as the single executable file "mci.tcl". Also,
+a Tcl interpreter is required though not provided, since on most Linux
+distributions and Windows, one is readily available, if not already installed.
+Here we'll discuss general usage in hopes of getting a feel for the software,
+while installation and troubleshooting are left for the Annex.
+
+Assuming we're in a directory where "mci" is installed, to run a test we simply
+give the following command:
+
+  ./mci.tcl -f f1.mci -N 1000
+
+This executes the "mci.tcl" application. The command line options control
+the execution. The "f" option tells "mci" where, in the file system, to read
+the function definition file, while the "N" option tells it how many points
+to use in sampling the function input space. A proper description of these
+options can be found in the appropriate section of this document or by invoking
+"mci" with the "info" or "help" options.
+
+  ./mci.tcl -info
+  ./mci.tcl -help
+
+This is how to use "mci" in general. Write a function definition file and
+invoke "mci" on it, using several command line options to control the Monte
+Carlo integration process.
+
+2.Program Input.
+
+This section describes the format of the function definition file. This file
+contains descriptions of several functions. "mci" will preform a numerical
+interation, on a specified range, for each of these in order.
+
+Here is an example of a file with one function, named "Theta".
+
+function Theta {
+  Params {
+    a {Real -1 1}
+    b {Real 0 +inf}
+  }
+
+  Range {
+    x {Real 0 1}
+    y {Real 0 2}
+    z {Real 0 4}
+  }
+
+  Rule {
+    $x + $a * $y + $b * $z*$z
+  }
+}
+
+Notice there are three sections. "Rule" describes the expression or rule used
+to calculate the function. The "Range" section describes the domain of the
+function. It consists of a list of pairs of name and type descriptors, each
+specifing one parameter for the function as well as the minimum and maximum
+allowed value. This information is used when generating random samples for
+integration or when searching for the minimum and maximum values for the
+function. The function's "Range" is a hyper-volume of dimension equal to the
+number of ranges defined. Similarly, the "Params" section describes a number
+of values on which the function depenends. These are supplied by the user
+(as command line options) and are kept constant during the integration and
+minimization/maximization phases. The section format is identical to the one
+used in the "Range" section.
+
+In general, there can be any number of functions defined in a definition file
+and "mci" will integrate them each in turn.
+
+The general format of a function definition is:
+
+function [name] {
+  Params {
+    ([param name] {Real [beg] [end]}) *
+  }
+
+  Range {
+    ([range name] {Real [beg] [end]}) *
+  }
+
+  Rule {
+    [analitical expression]
+  }
+}
+
+Sections enclosed in "[]" symbolise portions where text can vary, while
+sections in "()*" symbolise the fact that the enclosed section may appear 
+several times (or no times at all). White space is irrelevant and the
+three sections can appear in any order.
+
+The "beg" and "end" fields must be valid IEEE-754 floating point numbers.
+
+The "name", "param name" and "range name" fields must be valid C tokens. This
+means they must be non-empty, they may contain only letters, digits and the
+underscore ("_") character and cannot beging with a digit.
+
+The "analitical expression" represents the analitical expression of the
+function. It consists of variable references, constants, addition,
+substraction, multiplication, division, calling of mathematical functions,
+use of parantheses ("()") and combinations of all of the above. References
+to variables must be preceded by the dollar ("$") symbol, a la Tcl. The
+allowed functions are:
+
+abs	cosh	  log	sqrt
+acos	double	  log10	srand
+asin	exp	  pow	tan
+atan	floor	  rand	tanh
+atan2	fmod	  round	wide
+ceil	hypot	  sin
+cos	int	  sinh
+
+Range names and parameter names must be different for one function (so
+a function can have a range named after another functio's parameter but cannot
+have a range and parameter with the same name). Also, a parameter cannot
+be named one of "f", "N", "step", "info" and "help" because a clash would
+appear with the names of command line options with special meaning to "mci".
+The command line chapter will have more information about this, but, briefly,
+parameters are provided to the application as options.
+
+Any error will be raported to the caller and no work will be done, not even on
+valid functions.
+
+3.The Command Line.
+
+4.Monte Carlo Integration.
+
+5.The MinMax Algorhtim.
+
+6.Essential Data Structures.
+
+Annex A: Installation Guide.
+
+Annex B: Troubleshooting Guide.
