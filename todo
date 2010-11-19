@@ -1,9 +1,9 @@
 * Change "_recMinMax" to use upvar a lot instead of "array get"/"array set" etc.
 + Change generation of "monteCarloValue" to "randInRange"
 + Optimize speed: take out unecessary setups of parameters.
-* Make a README file and define stuff like ranges, parameters, hypercube, step-hypercube, fnData, clData, Monte Carlo integration ..
-* Check how the program behaves when the input function definition file is empty or the command line is empty.
-* Check options don't appear more than once in a command line.
-* Add checks for function name. Should be a C literal like all other user visible names.
-* Update "checkCommandLine" option name test. Should upgrade the re used.
-* Add checks for range and param names. They should be treated as C literals.
+- Make a README file and define stuff like ranges, parameters, hypercube, step-hypercube, fnData, clData, Monte Carlo integration ..
++ Check how the program behaves when the input function definition file is empty or the command line is empty.
++ Check options don't appear more than once in a command line.
++ Add checks for function name. Should be a C literal like all other user visible names.
++ Update "checkCommandLine" option name test. Should upgrade the re used.
++ Add checks for range and param names. They should be treated as C literals.

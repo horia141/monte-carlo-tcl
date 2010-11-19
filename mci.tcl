@@ -618,8 +618,8 @@ proc parseFnData {fnText} {
 #   option. This is techincally a HACK, but because we don't have to add
 #   extra processing steps for this situation in "main", it ends up saving us
 #   some headaches. The rest of the tests check that we have a proper number
-#   of items in "argv" (a multiple of two), and that the odd items are proper
-#   option names.
+#   of items in "argv" (a multiple of two), that the odd items are proper
+#   option names and that no duplicate options appear.
 # Arguments:
 #   argv: the list representation of the command line, as obtained from Tcl.
 # Return:
@@ -634,6 +634,10 @@ proc checkCommandLine {argv} {
     # we can into this, so a user can do multiple fixes at once.
 
     set clErrors [list]
+
+    # This is used in determining if an option appears multiple times.
+
+    array set optionNames {}
 
     # Scan for the "info" and "help" options. These are exclusive with normal
     # operation so other checks are not done. Notice that if both "info" and
@@ -662,6 +666,15 @@ proc checkCommandLine {argv} {
 
 	    if {![regexp {^-[a-zA-Z_][a-zA-Z0-9_]*} $optName]} {
 		lappend clErrors "Invalid format for option name : $optName"
+	    }
+
+	    # Check if the option was previously encountered. We do this by
+	    # checking if the current option's name is in "optionNames".
+
+	    if {[info exists optionNames($optName)]} {
+		lappend clErrors "Option \"$optName\" appears multiple times!"
+	    } else {
+		set optionNames($optName) 1
 	    }
 	}
     }
@@ -716,6 +729,13 @@ proc checkFnData {fnText} {
 	    lappend fnErrors "Invalid keyword \"$functionKeyword\"! Expecting \"function\" in:\n$functionKeyword [list $fnName] {$fnBody}"
 	}
 
+	# A function's name must be in the allowed format. Currently, this
+	# means it must be a proper C identifier.
+
+	if {![regexp {^[a-zA-Z_][a-zA-Z0-9_]*} $fnName]} {
+	    lappend fnErrors "Invalid format for function name : $fnName!"
+	}	
+
 	# Find the "Params" section and extract the associated "body" : a list
 	# of parameter descriptors.
 
@@ -752,6 +772,14 @@ proc checkFnData {fnText} {
 
 		if {[lsearch $CommandLineOptionNames $paramName] != -1} {
 		    lappend fnErrors "Invalid parameter name \"$paramName\" in function \"$fnName\"! Parameters must not be named: $CommandLineOptionNames"
+		}
+
+		# Second, the defined name should be in the allowed format.
+		# Currently, an parameter or range name must be a proper C
+		# identifier.
+
+		if {![regexp {^[a-zA-Z_][a-zA-Z0-9_]*} $paramName]} {
+		    lappend fnErrors "Invalid format for parameter name : $paramName!"
 		}
 
 		# Each parameter type has it's own checks.
@@ -829,6 +857,14 @@ proc checkFnData {fnText} {
 	    foreach {rangeName rangeBody} $rangesBody {
 		# For each pair in the "Ranges" section "body", we do several
 		# checks.
+
+		# Firstly, the defined name should be in the allowed format.
+		# Currently, an parameter or range name must be a proper C
+		# identifier.
+
+		if {![regexp {^[a-zA-Z_][a-zA-Z0-9_]*} $rangeName]} {
+		    lappend fnErrors "Invalid format for range name : $rangeName!"
+		}
 
 		# Each range type has it's own checks.
 
