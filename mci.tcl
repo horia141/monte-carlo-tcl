@@ -154,11 +154,12 @@ proc main {argv} {
 #   in the integration process and are usually hard to determine. To find the
 #   maximum we use a naive aproach: sample the hypervolume defined by the
 #   ranges of a function with a delta-hypervolume of side determined by the
-#   "step"  option and produce a multidimensional array of points. Search this
-#   array for the smallest and largest values and return in the "fnData" array,
-#   by updating the "Min" and "Max" keys for the selected function. Sampling
-#   and building the array are conceptual steps. We just walk in each dimension
-#   with a user defined step and remember the current best at each step.
+#   "step" option and produce a multidimensional array of points. Search this
+#   array for the smallest and largest values and return them in the "fnData"
+#   array, by updating the "Min" and "Max" keys for the selected function.
+#   Sampling and building the array are conceptual steps. We just walk in
+#   each dimension with a user defined step and remember the current best at
+#   each step.
 # Arguments:
 #   fnName: the name of a function. This must be present in the "fnData" array.
 #   arClData: the "array get" representation of "clData".
@@ -194,10 +195,10 @@ proc getFunctionMinMax {fnName arClData arFnData} {
 
     set position $begs
 
-    # Find the minimum and maximum. This function basically just does a setup
-    # for "_recMinMax".
+    # Find the minimum and maximum. "getFunctionMinMax" basically just does
+    # a setup for "_recMinMax".
 
-    set minMax [_recMinMax position $fnName $arClData $arFnData $begs $ends 0]
+    set minMax [_recMinMax position $fnName clData fnData begs ends 0]
 
     # Update the "fnData" array.
 
@@ -212,33 +213,39 @@ proc getFunctionMinMax {fnName arClData arFnData} {
 #
 # Context:
 #   This function is used by "getFunctionMinMax" to actually find the minimum
-#   and maximum of a certain function. This function will be invoked
-#   recursivley and each function will work on the "position" list passed
-#   by name from the caller. What this function does is pretty simple. In the
-#   one dimensional case (one range defined), we sample over the range interval
-#   with a step defined by the "step" option and return the minimum and maximum
-#   found. In an higher dimensional case (two or more ranges defined), we
-#   sample the range invterval indentified by "index" and for each step find
-#   the minimum and maximum by varying all the ranges from "index+1" to the
-#   end.
+#   and maximum of a certain function. It will be invoked recursivley and each
+#   invocation will work on the "position" list passed by name from the
+#   caller. What this function does is pretty simple. In the one dimensional
+#   case (one range defined), we sample over the range interval with a step
+#   defined by the "step" option and return the minimum and maximum found.
+#   In an higher dimensional case (two or more ranges defined), we sample the
+#   range interval indentified by "index" and for each step find the minimum
+#   and maximum by varying all the ranges from "index+1" to the end. Because
+#   of the many calls we have to make to find the extrema points, we're
+#   passing some major data-structures by name ("position","clData",
+#   "fnData","begs" and "ends"). In a normal world, this function should not
+#   be visible outside of "getFunctionMinMax".
 # Arguments:
 #   positionName: the name of the position list in the caller's context.
-#   fnName: the name of a function. This must be present in the "fnData" array.
-#   arClData: the "array get" representation of "clData".
-#   arFnData: the "array get" representation of "fnData".
-#   begs: the list of interval start values for each range.
-#   ends: the list of interval end values for each range.
+#   fnName: the name of a function. This must be a key in the "fnData" array.
+#   clDataName: the name of the "clData" array in the caller's environment.
+#   fnDataName: the name of the "fnData" array in the caller's environment.
+#   begsName: the name of the list of interval start values for each range,
+#     from the caller's environment.
+#   endsName: the name of the list of interval end values for each range,
+#     from the caller's environment.
 #   index: the current range to sample.
 # Return:
 #   A list of two elements: the minimum and the maximum found.
 # Effect:
 #   Update the variable identified by "positionName" in the caller's context.
 #
-proc _recMinMax {positionName fnName arClData arFnData begs ends index} {
+proc _recMinMax {positionName fnName clDataName fnDataName begsName endsName index} {
     upvar 1 $positionName position
-
-    array set clData $arClData
-    array set fnData $arFnData
+    upvar 1 $clDataName clData
+    upvar 1 $fnDataName fnData
+    upvar 1 $begsName begs
+    upvar 1 $endsName ends
 
     # The current minimum and maximum, initialized to easy to beat values.
 
@@ -285,7 +292,7 @@ proc _recMinMax {positionName fnName arClData arFnData begs ends index} {
 		lset position $i [lindex $begs $i]
 	    }
 
-	    set minMax [_recMinMax $positionName $fnName $arClData $arFnData $begs $ends [expr $index + 1]]
+	    set minMax [_recMinMax $positionName $fnName $clDataName $fnDataName $begsName $endsName [expr $index + 1]]
 	}
 
 	# Filter the minima and maxima.

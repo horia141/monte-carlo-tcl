@@ -1,4 +1,4 @@
-* Change "_recMinMax" to use upvar a lot instead of "array get"/"array set" etc.
++ Change "_recMinMax" to use upvar a lot instead of "array get"/"array set" etc.
 + Change generation of "monteCarloValue" to "randInRange"
 + Optimize speed: take out unecessary setups of parameters.
 - Make a README file and define stuff like ranges, parameters, hypercube, step-hypercube, fnData, clData, Monte Carlo integration ..
