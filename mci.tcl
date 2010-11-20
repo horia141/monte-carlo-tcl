@@ -161,7 +161,7 @@ proc main {argv} {
 #   each dimension with a user defined step and remember the current best at
 #   each step.
 # Arguments:
-#   fnName: the name of a function. This must be present in the "fnData" array.
+#   fnName: the name of a function. This must be a key in the "fnData" array.
 #   arClData: the "array get" representation of "clData".
 #   arFnData: the "array get" representation of "fnData".
 # Return:
@@ -256,8 +256,8 @@ proc _recMinMax {positionName fnName clDataName fnDataName begsName endsName ind
 
     set function $fnData(Fns,$fnName,Body)
 
-    # Here we sample each point from the current range (indentified by "index")
-    # walking with a step of "step".
+    # Here we sample each point from the current range (indentified by
+    # "index") walking with a step of "step".
 
     while {[lindex $position $index] <= [lindex $ends $index]} {
 	if {$index == ([llength $position] - 1)} {
@@ -328,7 +328,7 @@ proc _recMinMax {positionName fnName clDataName fnDataName begsName endsName ind
 #   in the volume determined by the function's surface. This ratio leads us
 #   to the final value of the definite integral.
 # Arguments:
-#   fnName: the name of a function. This must be present in the "fnData" array.
+#   fnName: the name of a function. This must be a key in the "fnData" array.
 #   arClData: the "array get" representation of "clData".
 #   arFnData: the "array get" representation of "fnData".
 # Return:
@@ -358,11 +358,12 @@ proc integrateFunction {fnName arClData arFnData} {
 
     set mcPointsBelow0 0
 
-    # This is the "area" defined by the function ranges. In the one dimensional
-    # case it is truly an area, while in later cases is is a hypervolume (in
-    # the quantitative sense of the word). It's computed as the product of
-    # the lengths of all the range intervals and the length of the image 
-    # interval in R. This value will be used to compute the definite integral.
+    # This is the "area" defined by the function ranges. In the one
+    # dimensional case it is truly an area, while in later cases is is a
+    # hypervolume (in the quantitative sense of the word). It's computed as
+    # the product of the lengths of all the range intervals and the length of
+    # the image interval in R. This value will be used to compute the
+    # definite integral.
 
     set area [expr 1.0 * ($max - $min)]
 
@@ -440,8 +441,9 @@ proc integrateFunction {fnName arClData arFnData} {
 #   None.
 #
 proc parseClData {argv} {
-    # Build the "clData" array with initial values. In case no suitable options
-    # are provided in the command line, some sensible defaults are used.
+    # Build the "clData" array with initial values. In case no suitable 
+    # options are provided in the command line, some sensible defaults are 
+    # used.
 
     array set clData {}
 
@@ -531,18 +533,19 @@ proc parseFnData {fnText} {
 	set ruleBody [lindex $fnBody [expr $ruleIndex + 1]]
 
 	# Extract function parameter information. Each parameter type has it's
-	# own way of interpreting it's body. We only have the "Real" type now,
-	# and it's pretty straight forward to extract.
+	# own way of interpreting it's body. For parameters we have the
+	# "Real", "Integer" and "Natural" types, for which information is 
+	# pretty straight forward to extract.
 
 	foreach {paramName paramBody} $paramsBody {
-	    switch -- [lindex $paramBody 0] {
-		Real {
+	    switch -regexp -- [lindex $paramBody 0] {
+		Real|Integer|Natural {
 		    # Add another parameter in "Fns,$fnName,ParamNames" and 
 		    # set its leaf values.
 
 		    lappend fnData(Fns,$fnName,ParamsNames) $paramName
 
-		    set fnData(Fns,$fnName,Params,$paramName,Type) Real
+		    set fnData(Fns,$fnName,Params,$paramName,Type) [lindex $paramBody 0]
 		    set fnData(Fns,$fnName,Params,$paramName,Beg) [lindex $paramBody 1]
 		    set fnData(Fns,$fnName,Params,$paramName,End) [lindex $paramBody 2]
 		}
@@ -695,15 +698,16 @@ proc checkCommandLine {argv} {
 # Context:
 #   This function is called from "main" before "parseFnData". Its job is to
 #   make ensure the contents of the function definition file are valid so that
-#   "parseFnData" doesn't have to worry about it (and, as a consequence, can do
-#   a clean job of parsing). The function, as all other "check*" functions,
+#   "parseFnData" doesn't have to worry about it (and, as a consequence, can 
+#   do a clean job of parsing). The function, as all other "check*" functions,
 #   returns a list of error messages. If this list is empty, "main" will
 #   continue with application execution. Otherwise, it will print the errors
 #   with "printErrors" and exit. The tests check that the high-level format
 #   is correct, that all sections in a function definition are present and
-#   that the descriptor for the single allowed range and parameter type (Real)
-#   is properly written. Finally, a test is done to see if the rule expression
-#   for all functions is a valid Tcl "expr" expression.
+#   that the descriptor for the single allowed range type (Real) and for the
+#   three allowed parameter types (Real, Integer and Natural) are properly
+#   written. Finally, a test is done to see if the rule expression for all
+#   functions is a valid Tcl "expr" expression.
 # Arguments:
 #   fnText: the contents of a function definition file.
 # Return:
@@ -728,7 +732,8 @@ proc checkFnData {fnText} {
     }
 
     foreach {functionKeyword fnName fnBody} $fnText {
-	# We scan each triple and check if the function it defines is allright.
+	# We scan each triple and check if the function it defines is
+	# allright.
 
 	# Every function definition must start with the "function" keyword.
 
@@ -751,8 +756,8 @@ proc checkFnData {fnText} {
 
 	# Several mutually exclusive options follow. The simplest cases are
 	# when no section is found or the section is not an even entry in the
-	# function descriptor "body". The last case usually means an incomplete
-	# section somewhere or some other syntax error.
+	# function descriptor "body". The last case usually means an 
+	# incomplete section somewhere or some other syntax error.
 
 	if {$paramsIndex == -1} {
 	    lappend fnErrors "Function \"$fnName\" does not contain a \"Params\" section!"
@@ -782,7 +787,7 @@ proc checkFnData {fnText} {
 		}
 
 		# Second, the defined name should be in the allowed format.
-		# Currently, an parameter or range name must be a proper C
+		# Currently, a parameter or range name must be a proper C
 		# identifier.
 
 		if {![regexp {^[a-zA-Z_][a-zA-Z0-9_]*} $paramName]} {
@@ -793,18 +798,18 @@ proc checkFnData {fnText} {
 
 		switch -- [lindex $paramBody 0] {
 		    Real {
-			# The only supported type, Real, has, as a descriptor,
-			# a triple of the form: "Real [interval beg] [interval
-			# end]".
+			# The first supported type, Real, has, as a
+			# descriptor, a triple of the form: "Real [interval
+			# beg] [interval end]".
 
 			# This checks that the parameter "body" is exactly 3.
 
 			if {[llength $paramBody] != 3} {
 			    lappend fnErrors "Invalid format for Real Param \"$paramName\" in function \"$fnName\": $paramBody!"
 			} else {
-			    # Here we test if "interval beg" and "interval end"
-			    # (the second and third items in the parameter
-			    # "body") are floating point numbers.
+			    # Here we test if "interval beg" and "interval
+			    # end" (the second and third items in the
+			    # parameter "body") are floating point numbers.
 
 			    if {![string is double [lindex $paramBody 1]]} {
 				lappend fnErrors "Invalid format for interval start in Real Param \"$paramName\" in function \"$fnName\": $paramBody!"
@@ -819,6 +824,72 @@ proc checkFnData {fnText} {
 
 			    if {[lindex $paramBody 1] >= [lindex $paramBody 2]} {
 				lappend fnErrors "Real Param \"$paramName\" from function \"$fnName\" has an interval start value greater than the interval end!"
+			    }
+			}
+		    }
+
+		    Integer {
+			# The second supported type, Integer, has, as a
+                        # descriptor, a triple of the form: "Integer [interval
+                        # beg] [interval # end]".
+
+			# This checks that the parameter "body" is exactly 3.
+
+			if {[llength $paramBody] != 3} {
+			    lappend fnErrors "Invalid format for Integer Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			} else {
+			    # Here we test if "interval beg" and "interval
+                            # end" (the second and third items in the
+                            # parameter "body") are integer numbers.
+
+			    if {![string is integer [lindex $paramBody 1]]} {
+				lappend fnErrors "Invalid format for interval start in Integer Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    }
+
+			    if {![string is integer [lindex $paramBody 2]]} {
+				lappend fnErrors "Invalid format for interval end in Integer Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    }
+
+			    # A final integrity test checks if "interval beg"
+			    # is smaller than "interval end".
+
+			    if {[lindex $paramBody 1] >= [lindex $paramBody 2]} {
+				lappend fnErrors "Integer Param \"$paramName\" from function \"$fnName\" has an interval start value greater than the interval end!"
+			    }
+			}
+		    }
+
+		    Natural {
+			# The third supported type, Natural, has, as a
+                        # descriptor, a triple of the form: "Natural [interval
+                        # beg] [interval end]".
+
+			# This checks that the parameter "body" is exactly 3.
+
+			if {[llength $paramBody] != 3} {
+			    lappend fnErrors "Invalid format for Natural Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			} else {
+			    # Here we test if "interval beg" and "interval
+                            # end" (the second and third items in the
+                            # parameter "body") are natural numbers.
+
+			    if {![string is integer [lindex $paramBody 1]]} {
+				lappend fnErrors "Invalid format for interval start in Natural Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    } elseif {[lindex $paramBody 1] < 0} {
+				lappend fnErrors "Negative interval start in Natural Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    }
+
+			    if {![string is double [lindex $paramBody 2]]} {
+				lappend fnErrors "Invalid format for interval end in Real Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    } elseif {[lindex $paramBody 2] < 0} {
+				lappend fnErrors "Negative interval end in Natural Param \"$paramName\" in function \"$fnName\": $paramBody!"
+			    }
+
+			    # A final integrity test checks if "interval beg"
+			    # is smaller than "interval end".
+
+			    if {[lindex $paramBody 1] >= [lindex $paramBody 2]} {
+				lappend fnErrors "Natural Param \"$paramName\" from function \"$fnName\" has an interval start value greater than the interval end!"
 			    }
 			}
 		    }
@@ -840,8 +911,8 @@ proc checkFnData {fnText} {
 
 	# Several mutually exclusive options follow. The simplest cases are
 	# when no section is found or the section is not an even entry in the
-	# function descriptor "body". The last case usually means an incomplete
-	# section somewhere or some other syntax error.
+	# function descriptor "body". The last case usually means an
+        # incomplete section somewhere or some other syntax error.
 
 	if {$rangesIndex == -1} {
 	    lappend fnErrors "Function \"$fnName\" does not contain a \"Ranges\" section!"
@@ -866,7 +937,7 @@ proc checkFnData {fnText} {
 		# checks.
 
 		# Firstly, the defined name should be in the allowed format.
-		# Currently, an parameter or range name must be a proper C
+		# Currently, a parameter or range name must be a proper C
 		# identifier.
 
 		if {![regexp {^[a-zA-Z_][a-zA-Z0-9_]*} $rangeName]} {
@@ -886,9 +957,9 @@ proc checkFnData {fnText} {
 			if {[llength $rangeBody] != 3} {
 			    lappend fnErrors "Invalid format for Real Range \"$rangeName\" in function \"$fnName\": $rangeBody!"
 			} else {
-			    # Here we test if "interval beg" and "interval end"
-			    # (the second and third items in the range "body") 
-			    # are floating point numbers.
+			    # Here we test if "interval beg" and "interval
+			    # end" (the second and third items in the range
+			    # "body") are floating point numbers.
 
 			    if {![string is double [lindex $rangeBody 1]]} {
 				lappend fnErrors "Invalid format for interval start in Real Range \"$rangeName\" in function \"$fnName\": $rangeBody!"
@@ -917,6 +988,7 @@ proc checkFnData {fnText} {
 	}
 
 	# Find the "Rule" section and extract the associated "body".
+
 
 	set ruleIndex [lsearch $fnBody Rule]
 	set ruleBody [lindex $fnBody [expr $ruleIndex + 1]]
@@ -1009,8 +1081,9 @@ proc postCheckFnData {arClData arFnData} {
 	}
     }
 
-    # Check supplied values are of type real and between the specified limits.
-    # We can only do this check after we've read the function definition file.
+    # Check supplied values are of proper type and between the specified
+    # limits. We can only do this check after we've read the function
+    # definition file.
 
     foreach {fnName} $fnData(FnNames) {
 	foreach {paramName} $fnData(Fns,$fnName,ParamsNames) {
@@ -1030,9 +1103,32 @@ proc postCheckFnData {arClData arFnData} {
 			}
 		    }
 
+		    Integer {
+			if {![string is integer -strict $clData(Params,$paramName)]} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" does not look like an integer number!"
+			} elseif {$clData(Params,$paramName) < $fnData(Fns,$fnName,Params,$paramName,Beg)} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" is smaller than the allowed minimum of \"$fnData(Fns,$fnName,Params,$paramName,Beg)\"!"
+			} elseif {$clData(Params,$paramName) > $fnData(Fns,$fnName,Params,$paramName,End)} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" is greater than the allowed maximum of \"$fnData(Fns,$fnName,Params,$paramName,End)\"!"
+			}
+		    } 
+
+		    Natural {
+			if {![string is integer -strict $clData(Params,$paramName)]} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" does not look like a natural number!"
+			} elseif {$clData(Params,$paramName) < 0} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" is not positive!"
+			} elseif {$clData(Params,$paramName) < $fnData(Fns,$fnName,Params,$paramName,Beg)} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" is smaller than the allowed minimum of \"$fnData(Fns,$fnName,Params,$paramName,Beg)\"!"
+			} elseif {$clData(Params,$paramName) > $fnData(Fns,$fnName,Params,$paramName,End)} {
+			    lappend postCheckErrors "Parameter \"$paramName\" for function \"$fnName\" is greater than the allowed maximum of \"$fnData(Fns,$fnName,Params,$paramName,End)\"!"
+			}
+		    } 
+
 		    default {
-			# We shouldn't ever get here. An unrecognized parameter
-			# type should have been flagged by "checkFnData".
+			# We shouldn't ever get here. An unrecognized
+			# parameter type should have been flagged by
+			# "checkFnData".
 
 			error "Unsupported execution path! Should not have arrived here"
 		    }
@@ -1145,8 +1241,9 @@ proc randInRange {beg end} {
 # Return:
 #   Nothing.
 # Effect:
-#   Print a number of messages to standard output using "puts". Whatever effect
-#   "[llength errorList]" calls to "puts" have, this function has as well.
+#   Print a number of messages to standard output using "puts". Whatever
+#   effect "[llength errorList]" calls to "puts" have, this function has as 
+#   well.
 #
 proc printErrors {errorsList} {
     foreach {errorMessage} $errorsList {
