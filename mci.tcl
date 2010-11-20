@@ -723,6 +723,24 @@ proc checkFnData {fnText} {
 
     set fnErrors [list]
 
+    # This is a first test to see if "fnText" is in a Tcl list like format.
+    # This is something we can easily work and we do all our parsing
+    # assuming whatever we get from the function definition file is such
+    # a list. If it's not, it's pretty pointless to continue. This
+    # test should use "string is list", but we don't have it yet.
+
+    if {![info complete $fnText]} {
+	return [list "Invalid format for input file!\n$fnText"]
+    }
+
+    set testResult [catch {
+	llength $fnText
+    } testErrors]
+
+    if {$testResult != 0} {
+	return [list "Invalid format for input file!\nReason: $testErrors\n$fnText"]
+    }
+
     # This is a crude test to see if we have enough items to form "function 
     # [name] [body]" triples. For example "function Q {...}" will pass, while
     # "function T" will not.

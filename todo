@@ -1,4 +1,4 @@
-* Add the simplest test: the function definition file is a valid tcl list.
++ Add the simplest test: the function definition file is a valid tcl list.
 + Change "_recMinMax" to use upvar a lot instead of "array get"/"array set" etc.
 + Change generation of "monteCarloValue" to "randInRange"
 + Optimize speed: take out unecessary setups of parameters.
