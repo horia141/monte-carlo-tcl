@@ -1,3 +1,6 @@
+* Add coments for function definition file.
+* Add the ability to use parameters in rage beg/end definitions.
+* Add the ability to use expressions in range/params definitions.
 + Add the simplest test: the function definition file is a valid tcl list.
 + Change "_recMinMax" to use upvar a lot instead of "array get"/"array set" etc.
 + Change generation of "monteCarloValue" to "randInRange"
