@@ -1,0 +1,13 @@
+function Alpha {
+    Params {
+        a {Natural 0 2}
+    }
+
+    Ranges {
+        x {Real 0 1}
+    }
+
+    Rule {
+        $x + $a
+    }
+}

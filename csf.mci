@@ -1,0 +1,14 @@
+function Nv0p {
+    Params {
+	A {Real -1 1}
+	B {Real -1 1}
+    }
+
+    Ranges {
+	v {Real 0 1000}
+    }
+
+    Rule {
+	100 * $A * $v*$v * exp(-1*$B * $v*$v)
+    }
+}
